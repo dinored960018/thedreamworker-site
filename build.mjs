@@ -21,6 +21,10 @@ const NAV = [
   ['records.html', '실적·네트워크'],
 ];
 const FORUM_EXT = 'https://forum.dreamventures.kr/';
+// PROD=1 node build.mjs → dist/ 에 정식 배포본(worker.dreamventures.kr): noindex 제거, canonical·og:url, 버전 전환 링크 제거
+const PROD = !!process.env.PROD;
+const SITE = 'https://worker.dreamventures.kr/';
+const OUT = PROD ? 'dist' : '.';
 
 // ── 공통 틀 ─────────────────────────────────────────────
 const head = (p) => `<!doctype html>
@@ -33,12 +37,13 @@ const head = (p) => `<!doctype html>
 <title>${esc(p.title)}</title>
 <meta name="description" content="${attr(p.desc)}">
 <meta name="theme-color" content="#241c17">
-<!-- 임시 프리뷰용. 실제 도메인에 올릴 때 이 줄을 지운다 -->
-<meta name="robots" content="noindex,nofollow">
+${PROD ? '' : `<!-- 임시 프리뷰용 -->
+<meta name="robots" content="noindex,nofollow">`}
 <link rel="icon" href="brand/favicon.png" type="image/png">
 <link rel="apple-touch-icon" href="brand/favicon.png">
-<!-- 도메인 확정 후 canonical · og:url · og:image 를 채운다 -->
-<meta property="og:type" content="website">
+${PROD ? `<link rel="canonical" href="${SITE}${p.file === 'index.html' ? '' : p.file}">
+<meta property="og:url" content="${SITE}${p.file === 'index.html' ? '' : p.file}">
+` : ''}<meta property="og:type" content="website">
 <meta property="og:site_name" content="더드림워커㈜">
 <meta property="og:title" content="${attr(p.title)}">
 <meta property="og:description" content="${attr(p.desc)}">
@@ -126,8 +131,7 @@ const footer = () => `
       <span>© 2026 THE DREAM WORKER</span>
       <span>사업자등록번호 ${C.bizNo}</span>
       <nav aria-label="하단 보조">
-        <!-- 시안 비교용: 정식 배포 때 아래 한 줄 삭제 -->
-        <a href="v2/index.html">다른 버전 보기</a>
+        ${PROD ? '' : '<a href="v2/index.html">다른 버전 보기</a>'}
         <a href="#top">맨 위로</a>
       </nav>
     </div>
@@ -548,5 +552,18 @@ ${band('network', 'soft', 'NETWORK', '네트워크', '', `      <div class="net 
 `,
 });
 
-for (const p of pages) fs.writeFileSync(p.file, page(p));
+if (PROD) {
+  fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(OUT);
+  for (const f of ['brand', 'fonts', 'img', 'styles.css', 'site.js']) fs.cpSync(f, `${OUT}/${f}`, { recursive: true });
+  fs.writeFileSync(`${OUT}/robots.txt`, `User-agent: *
+Allow: /
+Sitemap: ${SITE}sitemap.xml
+`);
+  fs.writeFileSync(`${OUT}/sitemap.xml`, `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${pages.map((p) => `  <url><loc>${SITE}${p.file === 'index.html' ? '' : p.file}</loc></url>`).join('\n')}
+</urlset>
+`);
+}
+for (const p of pages) fs.writeFileSync(`${OUT}/${p.file}`, page(p));
 console.log('built', pages.map((p) => p.file).join(' '));
