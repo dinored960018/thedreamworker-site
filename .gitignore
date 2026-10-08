@@ -1,0 +1,6 @@
+node_modules/
+.impeccable/
+.DS_Store
+Thumbs.db
+README.md
+_qa/
